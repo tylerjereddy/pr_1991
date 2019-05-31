@@ -61,14 +61,20 @@ for ts in u.trajectory:
 # in "static" second universe, using *weights="mass"*
 u = mda.Universe(dataset.topology, dataset.trajectory)
 ag = u.select_atoms("protein")
+print("ag.masses:", ag.masses)
 ref_static = mda.Universe(dataset.topology, dataset.trajectory).select_atoms("protein")
 transform = fit_translation(ag, ref_static, plane="xy",
                             weights="mass")
 u.trajectory.add_transformations(transform)
 static_weights_fit_trans_cog = []
+static_weights_fit_trans_com = []
 for ts in u.trajectory:
     print("weights fit_trans frame:", ts.frame)
     static_weights_fit_trans_cog.append(ag.centroid())
+    static_weights_fit_trans_com.append(ag.center(weights=ag.masses))
+    print("ag.centroid():", ag.centroid())
+    print("ag COM:", ag.center(weights=ag.masses))
+    print("ref.centroid():", ref.centroid())
 
 #----
 # plot results
@@ -97,3 +103,21 @@ for axis, data, title in zip([ax, ax2, ax3, ax4],
 fig.subplots_adjust(hspace=0.4)
 fig.set_size_inches(6, 6)
 fig.savefig('pr_1991.png', dpi=300)
+
+# add another fig for COM vs centroid
+# in tracking fit_trans performance
+# when weights=mass is used
+fig2 = plt.figure()
+ax = fig2.add_subplot(111)
+ax.set_title('weights="mass" AND COM tracking')
+coords = np.array(static_weights_fit_trans_com)
+ax.scatter(coords[...,0], coords[...,1], s=2)
+ax.set_xlabel('x')
+ax.set_ylabel('y')
+ax.set_xlim([0, 60])
+ax.set_ylim([0, 60])
+ax.set_xticks([0, 20, 40, 60])
+ax.set_yticks([0, 20, 40, 60])
+ax.set_aspect('equal')
+fig2.set_size_inches(6, 6)
+fig2.savefig('pr_1991_fig2.png', dpi=300)
