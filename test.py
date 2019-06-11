@@ -20,6 +20,7 @@ u = mda.Universe(dataset.topology, dataset.trajectory)
 
 ag = u.select_atoms("protein")
 ref = u.select_atoms("protein")
+ref_pos = ref.positions.copy()
 
 #----
 # without any transform
@@ -42,7 +43,7 @@ fit_trans_rmsd = []
 for ts in u.trajectory:
     print("fit_trans frame:", ts.frame)
     fit_trans_cog.append(ag.centroid())
-    fit_trans_rmsd.append(rmsd(ag.positions, ref.positions))
+    fit_trans_rmsd.append(rmsd(ag.positions, ref_pos))
 
 u.trajectory[0]
 
@@ -50,15 +51,16 @@ u.trajectory[0]
 # same thing with fit_rot_trans
 u = mda.Universe(dataset.topology, dataset.trajectory)
 ag = u.select_atoms("protein")
-ref_static = mda.Universe(dataset.topology, dataset.trajectory).select_atoms("protein")
-transform = fit_rot_trans(ag, ref_static, plane=None,
+ref = u.select_atoms("protein")
+ref_pos = ref.positions.copy()
+transform = fit_rot_trans(ag, ref, plane=None,
                             weights=None)
 u.trajectory.add_transformations(transform)
 fit_trans_rot_cog = []
 fit_trans_rot_rmsd = []
 for ts in u.trajectory:
     fit_trans_rot_cog.append(ag.centroid())
-    fit_trans_rot_rmsd.append(rmsd(ag.positions, ref.positions))
+    fit_trans_rot_rmsd.append(rmsd(ag.positions, ref_pos))
 
 #----
 # remove translation in xy relative to self
@@ -66,6 +68,7 @@ for ts in u.trajectory:
 u = mda.Universe(dataset.topology, dataset.trajectory)
 ag = u.select_atoms("protein")
 ref_static = mda.Universe(dataset.topology, dataset.trajectory).select_atoms("protein")
+ref_pos = ref_static.positions.copy()
 transform = fit_translation(ag, ref_static, plane="xy",
                             weights=None)
 u.trajectory.add_transformations(transform)
@@ -74,13 +77,14 @@ static_fit_trans_rmsd = []
 for ts in u.trajectory:
     print("static fit_trans frame:", ts.frame)
     static_fit_trans_cog.append(ag.centroid())
-    static_fit_trans_rmsd.append(rmsd(ag.positions, ref_static.positions))
+    static_fit_trans_rmsd.append(rmsd(ag.positions, ref_pos))
 
 #----
 # same thing with with fit_rot_trans
 u = mda.Universe(dataset.topology, dataset.trajectory)
 ag = u.select_atoms("protein")
 ref_static = mda.Universe(dataset.topology, dataset.trajectory).select_atoms("protein")
+ref_pos = ref_static.positions.copy()
 transform = fit_rot_trans(ag, ref_static, plane=None,
                             weights=None)
 u.trajectory.add_transformations(transform)
@@ -89,7 +93,7 @@ static_fit_trans_rot_rmsd = []
 for ts in u.trajectory:
     print("static fit_trans frame:", ts.frame)
     static_fit_trans_rot_cog.append(ag.centroid())
-    static_fit_trans_rot_rmsd.append(rmsd(ag.positions, ref_static.positions))
+    static_fit_trans_rot_rmsd.append(rmsd(ag.positions, ref_pos))
 
 #----
 # remove translation in xy relative to self
@@ -98,6 +102,7 @@ u = mda.Universe(dataset.topology, dataset.trajectory)
 ag = u.select_atoms("protein")
 print("ag.masses:", ag.masses)
 ref_static = mda.Universe(dataset.topology, dataset.trajectory).select_atoms("protein")
+ref_pos = ref_static.positions.copy()
 transform = fit_translation(ag, ref_static, plane="xy",
                             weights="mass")
 u.trajectory.add_transformations(transform)
@@ -108,7 +113,7 @@ for ts in u.trajectory:
     print("weights fit_trans frame:", ts.frame)
     static_weights_fit_trans_cog.append(ag.centroid())
     static_weights_fit_trans_com.append(ag.center(weights=ag.masses))
-    static_weights_fit_trans_rmsd.append(rmsd(ag.positions, ref_static.positions))
+    static_weights_fit_trans_rmsd.append(rmsd(ag.positions, ref_pos))
     print("ag.centroid():", ag.centroid())
     print("ag COM:", ag.center(weights=ag.masses))
     print("ref.centroid():", ref.centroid())
@@ -118,6 +123,7 @@ for ts in u.trajectory:
 u = mda.Universe(dataset.topology, dataset.trajectory)
 ag = u.select_atoms("protein")
 ref_static = mda.Universe(dataset.topology, dataset.trajectory).select_atoms("protein")
+ref_pos = ref_static.positions.copy()
 transform = fit_rot_trans(ag, ref_static, plane=None,
                             weights="mass")
 u.trajectory.add_transformations(transform)
@@ -127,7 +133,7 @@ static_weights_fit_trans_rot_rmsd = []
 for ts in u.trajectory:
     static_weights_fit_trans_rot_cog.append(ag.centroid())
     static_weights_fit_trans_rot_com.append(ag.center(weights=ag.masses))
-    static_weights_fit_trans_rot_rmsd.append(rmsd(ag.positions, ref_static.positions))
+    static_weights_fit_trans_rot_rmsd.append(rmsd(ag.positions, ref_pos))
 
 #----
 # plot results
@@ -182,3 +188,39 @@ ax.set_yticks([0, 20, 40, 60])
 ax.set_aspect('equal')
 fig2.set_size_inches(6, 6)
 fig2.savefig('pr_1991_fig2.png', dpi=300)
+
+#----
+# plot rmsd results
+fig_rmsd = plt.figure()
+ax = fig_rmsd.add_subplot(221)
+ax2 = fig_rmsd.add_subplot(222)
+ax3 = fig_rmsd.add_subplot(223)
+
+for axis, data, rot_trans_data, title in zip([ax, ax2, ax3],
+                             [fit_trans_rmsd, static_fit_trans_rmsd,
+                              static_weights_fit_trans_rmsd],
+                             [fit_trans_rot_rmsd, static_fit_trans_rot_rmsd,
+                              static_weights_fit_trans_rot_rmsd],
+                             ['rmsd same traj',
+                              'rmsd second univ', 'rmsd with weights="mass"']):
+    axis.set_title(title)
+    rmsd_data = np.array(data)
+    rmsd_rot_trans_data = np.array(rot_trans_data)
+    x_vals = np.arange(len(rmsd_data))
+    axis.scatter(x_vals, rmsd_data, s=2, label='fit_translation')
+    axis.scatter(x_vals,
+                 rmsd_rot_trans_data, s=2,
+                 color='brown',
+                 alpha=0.2, label='fit_rot_trans')
+    axis.set_xlabel('frame')
+    axis.set_ylabel('rmsd')
+    #axis.set_xlim([0, 60])
+    #axis.set_ylim([0, 60])
+    #axis.set_xticks([0, 20, 40, 60])
+    #axis.set_yticks([0, 20, 40, 60])
+    #axis.set_aspect('equal')
+    axis.legend()
+
+fig_rmsd.subplots_adjust(hspace=0.4)
+fig_rmsd.set_size_inches(6, 6)
+fig_rmsd.savefig('pr_1991_rmsd.png', dpi=300)
