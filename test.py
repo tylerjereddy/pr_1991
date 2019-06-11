@@ -2,6 +2,8 @@ import numpy as np
 import MDAnalysis as mda
 from MDAnalysis.transformations import fit_translation, fit_rot_trans
 import MDAnalysisData
+import MDAnalysis.analysis.rms
+from MDAnalysis.analysis.rms import rmsd
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -36,11 +38,27 @@ transform = fit_translation(ag, ref, plane="xy",
                             weights=None)
 u.trajectory.add_transformations(transform)
 fit_trans_cog = []
+fit_trans_rmsd = []
 for ts in u.trajectory:
     print("fit_trans frame:", ts.frame)
     fit_trans_cog.append(ag.centroid())
+    fit_trans_rmsd.append(rmsd(ag.positions, ref.positions))
 
 u.trajectory[0]
+
+#----
+# same thing with fit_rot_trans
+u = mda.Universe(dataset.topology, dataset.trajectory)
+ag = u.select_atoms("protein")
+ref_static = mda.Universe(dataset.topology, dataset.trajectory).select_atoms("protein")
+transform = fit_rot_trans(ag, ref_static, plane=None,
+                            weights=None)
+u.trajectory.add_transformations(transform)
+fit_trans_rot_cog = []
+fit_trans_rot_rmsd = []
+for ts in u.trajectory:
+    fit_trans_rot_cog.append(ag.centroid())
+    fit_trans_rot_rmsd.append(rmsd(ag.positions, ref.positions))
 
 #----
 # remove translation in xy relative to self
@@ -52,9 +70,26 @@ transform = fit_translation(ag, ref_static, plane="xy",
                             weights=None)
 u.trajectory.add_transformations(transform)
 static_fit_trans_cog = []
+static_fit_trans_rmsd = []
 for ts in u.trajectory:
     print("static fit_trans frame:", ts.frame)
     static_fit_trans_cog.append(ag.centroid())
+    static_fit_trans_rmsd.append(rmsd(ag.positions, ref_static.positions))
+
+#----
+# same thing with with fit_rot_trans
+u = mda.Universe(dataset.topology, dataset.trajectory)
+ag = u.select_atoms("protein")
+ref_static = mda.Universe(dataset.topology, dataset.trajectory).select_atoms("protein")
+transform = fit_rot_trans(ag, ref_static, plane=None,
+                            weights=None)
+u.trajectory.add_transformations(transform)
+static_fit_trans_rot_cog = []
+static_fit_trans_rot_rmsd = []
+for ts in u.trajectory:
+    print("static fit_trans frame:", ts.frame)
+    static_fit_trans_rot_cog.append(ag.centroid())
+    static_fit_trans_rot_rmsd.append(rmsd(ag.positions, ref_static.positions))
 
 #----
 # remove translation in xy relative to self
@@ -68,13 +103,31 @@ transform = fit_translation(ag, ref_static, plane="xy",
 u.trajectory.add_transformations(transform)
 static_weights_fit_trans_cog = []
 static_weights_fit_trans_com = []
+static_weights_fit_trans_rmsd = []
 for ts in u.trajectory:
     print("weights fit_trans frame:", ts.frame)
     static_weights_fit_trans_cog.append(ag.centroid())
     static_weights_fit_trans_com.append(ag.center(weights=ag.masses))
+    static_weights_fit_trans_rmsd.append(rmsd(ag.positions, ref_static.positions))
     print("ag.centroid():", ag.centroid())
     print("ag COM:", ag.center(weights=ag.masses))
     print("ref.centroid():", ref.centroid())
+
+#----
+# same thing with fit_rot_trans
+u = mda.Universe(dataset.topology, dataset.trajectory)
+ag = u.select_atoms("protein")
+ref_static = mda.Universe(dataset.topology, dataset.trajectory).select_atoms("protein")
+transform = fit_rot_trans(ag, ref_static, plane=None,
+                            weights="mass")
+u.trajectory.add_transformations(transform)
+static_weights_fit_trans_rot_cog = []
+static_weights_fit_trans_rot_com = []
+static_weights_fit_trans_rot_rmsd = []
+for ts in u.trajectory:
+    static_weights_fit_trans_rot_cog.append(ag.centroid())
+    static_weights_fit_trans_rot_com.append(ag.center(weights=ag.masses))
+    static_weights_fit_trans_rot_rmsd.append(rmsd(ag.positions, ref_static.positions))
 
 #----
 # plot results
@@ -84,14 +137,21 @@ ax2 = fig.add_subplot(222)
 ax3 = fig.add_subplot(223)
 ax4 = fig.add_subplot(224)
 
-for axis, data, title in zip([ax, ax2, ax3, ax4],
+for axis, data, rot_trans_data, title in zip([ax, ax2, ax3, ax4],
                              [native_cog, fit_trans_cog, static_fit_trans_cog,
                               static_weights_fit_trans_cog],
+                             [native_cog, fit_trans_rot_cog, static_fit_trans_rot_cog,
+                              static_weights_fit_trans_rot_cog],
                              ['native', 'fit_trans same traj',
                               'fit_trans second univ', 'with weights="mass"']):
     axis.set_title(title)
     coords = np.array(data)
-    axis.scatter(coords[...,0], coords[...,1], s=2)
+    coords_rot_trans = np.array(rot_trans_data)
+    axis.scatter(coords[...,0], coords[...,1], s=2, label='fit_translation')
+    axis.scatter(coords_rot_trans[...,0],
+                 coords_rot_trans[...,1], s=2,
+                 color='brown',
+                 alpha=0.2, label='fit_rot_trans')
     axis.set_xlabel('x')
     axis.set_ylabel('y')
     axis.set_xlim([0, 60])
@@ -99,6 +159,7 @@ for axis, data, title in zip([ax, ax2, ax3, ax4],
     axis.set_xticks([0, 20, 40, 60])
     axis.set_yticks([0, 20, 40, 60])
     axis.set_aspect('equal')
+    axis.legend()
 
 fig.subplots_adjust(hspace=0.4)
 fig.set_size_inches(6, 6)
